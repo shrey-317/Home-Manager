@@ -62,17 +62,15 @@ export function TimerScreen() {
     if (targets) dispatch({ type: 'SET_CONFIG', config: targets.preInfusion });
   }, [targets]);
 
-  // Drive the clock with rAF. rAF is throttled in a hidden tab, but since every reading is a
-  // `performance.now()` delta, a late frame corrects itself instead of losing time.
+  // Tick at 10 Hz, which is exactly the precision the display shows. A per-frame rAF loop would
+  // re-render sixty times a second to move a tenth-of-a-second digit — six times the work for no
+  // visible difference, on a device that is probably not plugged in. The reading itself is always
+  // a `performance.now()` delta, so a late or throttled tick corrects itself rather than losing
+  // time.
   useEffect(() => {
     if (!running) return;
-    let frame = 0;
-    const loop = () => {
-      dispatch({ type: 'TICK', at: performance.now() });
-      frame = requestAnimationFrame(loop);
-    };
-    frame = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(frame);
+    const id = setInterval(() => dispatch({ type: 'TICK', at: performance.now() }), 100);
+    return () => clearInterval(id);
   }, [running]);
 
   // Coming back to a foregrounded tab: catch up immediately rather than on the next frame.
@@ -143,7 +141,12 @@ export function TimerScreen() {
       <LogShotSheet
         ctx={ctx}
         timer={state}
-        onSaved={(shotId) => setSavedShotId(shotId)}
+        onSaved={(shotId) => {
+          // Drop the persisted pull the moment it's been logged. Otherwise a reload restores a
+          // stopped timer that still looks unlogged, and the same shot gets saved twice.
+          clearSavedTimer();
+          setSavedShotId(shotId);
+        }}
         onDiscardTimer={() => {
           clearSavedTimer();
           dispatch({ type: 'RESET' });

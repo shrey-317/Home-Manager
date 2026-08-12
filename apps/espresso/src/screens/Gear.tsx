@@ -170,7 +170,7 @@ function MachineCard({ machine }: { machine: MachineGear }) {
         />
       </Field>
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-3 space-y-3">
         <Field label="P1 saturation" hint="Low pressure.">
           <Stepper
             label="P1 seconds"

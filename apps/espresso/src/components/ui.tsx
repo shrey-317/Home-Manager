@@ -40,18 +40,32 @@ const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-crust-100 text-crust-950 active:bg-crust-200',
   secondary: 'bg-crust-800 text-crust-100 active:bg-crust-700',
   ghost: 'bg-transparent text-crust-200 border border-crust-700 active:bg-crust-800',
-  danger: 'bg-[--color-bad] text-white active:opacity-90',
+  danger: 'bg-bad text-white active:opacity-90',
+};
+
+/**
+ * Size is a prop rather than something callers override with a class. Passing `min-h-10` in
+ * `className` looks like it should win but doesn't: both utilities have the same specificity, so
+ * whichever Tailwind emits later wins regardless of the order they appear in the attribute.
+ */
+type ButtonSize = 'sm' | 'md' | 'lg';
+
+const SIZES: Record<ButtonSize, string> = {
+  sm: 'min-h-10 px-3 text-sm',
+  md: 'min-h-14 px-5 text-base',
+  lg: 'min-h-16 px-5 text-lg tracking-wide',
 };
 
 export function Button({
   variant = 'secondary',
+  size = 'md',
   className = '',
   children,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: ButtonSize }) {
   return (
     <button
-      className={`min-h-14 rounded-xl px-5 text-base font-semibold transition-colors disabled:opacity-40 ${VARIANTS[variant]} ${className}`}
+      className={`rounded-xl font-semibold transition-colors disabled:opacity-40 ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
       {...rest}
     >
       {children}
@@ -68,7 +82,8 @@ export function BigButton({
   return (
     <Button
       {...rest}
-      className={`w-full min-h-16 text-lg tracking-wide ${className}`}
+      size="lg"
+      className={`w-full ${className}`}
       variant={rest.variant ?? 'primary'}
     >
       {children}
@@ -91,11 +106,11 @@ export function StatTile({
 }) {
   const toneClass =
     tone === 'good'
-      ? 'text-[--color-good]'
+      ? 'text-good'
       : tone === 'warn'
-        ? 'text-[--color-warn]'
+        ? 'text-warn'
         : tone === 'bad'
-          ? 'text-[--color-bad]'
+          ? 'text-bad'
           : 'text-crust-50';
   return (
     <div className="rounded-xl border border-crust-800 bg-crust-900 p-3">
@@ -198,11 +213,14 @@ export function Stepper({
         type="button"
         aria-label={`Decrease ${label}`}
         onClick={() => onChange(clamp(value - step))}
-        className="w-16 shrink-0 text-2xl"
+        // 56px keeps a comfortable thumb target while leaving the value room to breathe.
+        className="w-14 shrink-0 px-0 text-2xl"
       >
         −
       </Button>
-      <div className="relative flex-1">
+      {/* `min-w-0` is what stops the value being squeezed to nothing by the two buttons when a
+          stepper sits in a narrow column. */}
+      <div className="relative min-w-0 flex-1">
         <input
           inputMode="decimal"
           aria-label={label}
@@ -211,10 +229,12 @@ export function Stepper({
             const next = Number.parseFloat(e.target.value);
             if (!Number.isNaN(next)) onChange(clamp(next));
           }}
-          className="tnum min-h-14 w-full rounded-xl border border-crust-700 bg-crust-950 px-4 text-center text-2xl font-semibold text-crust-50 outline-none focus:border-crust-400"
+          className={`tnum min-h-14 w-full rounded-xl border border-crust-700 bg-crust-950 text-center text-2xl font-semibold text-crust-50 outline-none focus:border-crust-400 ${
+            unit ? 'pl-4 pr-7' : 'px-3'
+          }`}
         />
         {unit ? (
-          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-crust-500">
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-sm text-crust-500">
             {unit}
           </span>
         ) : null}
@@ -223,7 +243,7 @@ export function Stepper({
         type="button"
         aria-label={`Increase ${label}`}
         onClick={() => onChange(clamp(value + step))}
-        className="w-16 shrink-0 text-2xl"
+        className="w-14 shrink-0 px-0 text-2xl"
       >
         +
       </Button>
@@ -285,7 +305,7 @@ export function Toggle({
       </span>
       <span
         className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
-          checked ? 'bg-[--color-good]' : 'bg-crust-700'
+          checked ? 'bg-good' : 'bg-crust-700'
         }`}
       >
         <span

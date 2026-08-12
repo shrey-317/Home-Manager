@@ -47,7 +47,7 @@ export const PRE_INFUSION_SEC = 9;
  * coach's verdict is shown.
  */
 export async function pullShot(page: Page, spec: ShotSpec): Promise<void> {
-  await page.getByRole('link', { name: 'Pull' }).click();
+  await nav(page, 'Pull').click();
   await page.getByRole('button', { name: /^Start/ }).click();
 
   if (spec.firstDripSec !== undefined) {
@@ -92,4 +92,14 @@ export async function settle(page: Page, ms = 250): Promise<void> {
 /** The coach's headline on the post-shot screen. */
 export function adviceHeadline(page: Page) {
   return page.getByRole('heading', { level: 2 }).first();
+}
+
+/**
+ * A bottom-navigation link, scoped to the nav.
+ *
+ * Screens contain their own links to the same places ("Go to beans" on an empty state), so an
+ * unscoped `getByRole('link', { name: 'Beans' })` matches more than one and fails on strictness.
+ */
+export function nav(page: Page, name: 'Home' | 'Beans' | 'Pull' | 'Stats' | 'Setup') {
+  return page.getByRole('navigation').getByRole('link', { name, exact: true });
 }

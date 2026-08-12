@@ -33,7 +33,7 @@ export function Beans() {
     <>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xs font-semibold uppercase tracking-[0.2em] text-crust-500">Beans</h1>
-        <Button variant="ghost" className="min-h-10 px-3 text-sm" onClick={() => setAdding((a) => !a)}>
+        <Button variant="ghost" size="sm" onClick={() => setAdding((a) => !a)}>
           {adding ? 'Cancel' : 'Add bag'}
         </Button>
       </div>
@@ -76,7 +76,7 @@ function BeanRow({ bean, isActive }: { bean: Bean; isActive: boolean }) {
   const rest = restVerdict(days);
 
   return (
-    <Card as="li" className={isActive ? 'border-[--color-good]' : ''}>
+    <Card as="li" className={isActive ? 'border-good' : ''}>
       <div className="flex items-start justify-between gap-3">
         <Link to={`/beans/${bean.id}`} className="min-w-0 flex-1">
           <h2 className="truncate text-base font-semibold text-crust-50">{bean.name}</h2>
@@ -90,13 +90,14 @@ function BeanRow({ bean, isActive }: { bean: Bean; isActive: boolean }) {
           </p>
         </Link>
         {isActive ? (
-          <span className="shrink-0 rounded-full bg-[--color-good] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+          <span className="shrink-0 rounded-full bg-good px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
             Dialling
           </span>
         ) : (
           <Button
             variant="ghost"
-            className="min-h-10 shrink-0 px-3 text-sm"
+            size="sm"
+            className="shrink-0"
             onClick={async () => {
               const session = await startSession(bean.id);
               if (session) navigate('/');

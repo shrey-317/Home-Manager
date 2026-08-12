@@ -10,11 +10,11 @@ import { Button } from './ui.tsx';
  */
 
 const TONE: Record<Advice['action']['kind'], { border: string; text: string; label: string }> = {
-  grind: { border: 'border-[--color-warn]', text: 'text-[--color-warn]', label: 'Adjust the grind' },
-  temp: { border: 'border-[--color-warn]', text: 'text-[--color-warn]', label: 'Adjust temperature' },
+  grind: { border: 'border-warn', text: 'text-warn', label: 'Adjust the grind' },
+  temp: { border: 'border-warn', text: 'text-warn', label: 'Adjust temperature' },
   hold: { border: 'border-crust-600', text: 'text-crust-200', label: 'Hold and repeat' },
-  'lock-in': { border: 'border-[--color-good]', text: 'text-[--color-good]', label: 'Dialled in' },
-  reshoot: { border: 'border-[--color-bad]', text: 'text-[--color-bad]', label: 'Pull again' },
+  'lock-in': { border: 'border-good', text: 'text-good', label: 'Dialled in' },
+  reshoot: { border: 'border-bad', text: 'text-bad', label: 'Pull again' },
   none: { border: 'border-crust-700', text: 'text-crust-300', label: 'Getting started' },
 };
 

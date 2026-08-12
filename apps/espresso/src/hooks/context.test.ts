@@ -84,10 +84,35 @@ describe('buildDialInContext', () => {
     expect(ctx.session?.id).toBe('newest');
   });
 
-  it('returns an empty context when nothing is being dialled', () => {
+  it('falls back to the most recent locked session when nothing is being dialled', () => {
+    // Otherwise locking a dial in — the one success in the loop — empties the home screen.
     const ctx = buildDialInContext({
       ...base,
-      sessions: [session({ status: 'locked' })],
+      sessions: [
+        session({ id: 'old-locked', status: 'locked', startedAt: 5 }),
+        session({ id: 'locked', status: 'locked', startedAt: 50, lockedDial: 17 }),
+      ],
+      shots: [],
+    });
+    expect(ctx.session?.id).toBe('locked');
+  });
+
+  it('prefers a session still being dialled over a locked one', () => {
+    const ctx = buildDialInContext({
+      ...base,
+      sessions: [
+        session({ id: 'locked', status: 'locked', startedAt: 500 }),
+        session({ id: 'dialing', status: 'dialing', startedAt: 1 }),
+      ],
+      shots: [],
+    });
+    expect(ctx.session?.id).toBe('dialing');
+  });
+
+  it('returns an empty context when there is nothing but abandoned sessions', () => {
+    const ctx = buildDialInContext({
+      ...base,
+      sessions: [session({ status: 'abandoned' })],
       shots: [],
     });
     expect(ctx.session).toBeUndefined();

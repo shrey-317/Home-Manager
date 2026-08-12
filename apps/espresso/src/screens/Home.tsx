@@ -80,6 +80,13 @@ export function Home() {
           />
         </dl>
 
+        {session.status === 'locked' ? (
+          <p className="mt-3 rounded-lg border border-good p-2 text-xs text-crust-200">
+            Dialled in at {session.lockedDial}. Keep pulling at this setting — if it drifts as the
+            beans age, the coach picks that up from the next shot.
+          </p>
+        ) : null}
+
         {rest === 'too-fresh' ? (
           <p className="mt-3 rounded-lg bg-crust-800 p-2 text-xs text-crust-300">
             Only {days} days off roast — fresh beans degas and can run fast and taste sharp. It may
@@ -101,7 +108,7 @@ export function Home() {
           />
         </div>
       ) : !grinder ? (
-        <Card className="mb-4 border-[--color-bad]">
+        <Card className="mb-4 border-bad">
           <p className="text-sm text-crust-200">
             This session has no grinder attached, so there's no dial to advise on.{' '}
             <Link to="/gear" className="underline">

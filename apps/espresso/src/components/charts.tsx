@@ -11,7 +11,6 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  ZAxis,
 } from 'recharts';
 import { brewRatio, shotTimeOnBasis } from '../domain/metrics.ts';
 import type { Shot, Targets } from '../domain/types.ts';
@@ -39,11 +38,29 @@ const SERIES_2 = '#d95926';
 const AXIS_INK = '#a3866d';
 const GRID = '#332720';
 const BAND = '#0ca30c';
+/** The card colour these charts sit on; used for the ring that separates overlapping marks. */
+const SURFACE = '#211a15';
 
 const axisProps = {
   stroke: AXIS_INK,
   tick: { fill: AXIS_INK, fontSize: 11 },
   tickLine: false,
+} as const;
+
+/**
+ * The target window.
+ *
+ * It is context, not data, so it stays recessive — a solid block of green competes with the marks
+ * it exists to frame. `extendDomain` keeps it drawn even when every shot lands outside it, which
+ * is precisely when you most need to see where the window is.
+ */
+const BAND_STYLE = {
+  fill: BAND,
+  fillOpacity: 0.1,
+  stroke: BAND,
+  strokeOpacity: 0.3,
+  strokeDasharray: '3 3',
+  ifOverflow: 'extendDomain',
 } as const;
 
 function ChartTooltip({
@@ -131,6 +148,29 @@ function Table({ head, rows }: { head: string[]; rows: (string | number)[][] }) 
   );
 }
 
+/**
+ * Recharts sizes scatter marks from the ZAxis *area*, which is both indirect and easy to lose
+ * to defaults — the marks came out about 2px wide. An explicit shape guarantees the ≥8px mark
+ * the spec calls for, with a surface-coloured ring so overlapping points stay countable.
+ */
+function Dot({ cx, cy, fill }: { cx?: number; cy?: number; fill?: string }) {
+  if (cx === undefined || cy === undefined) return null;
+  return <circle cx={cx} cy={cy} r={5} fill={fill ?? SERIES_1} stroke={SURFACE} strokeWidth={2} />;
+}
+
+/**
+ * A y-domain that always contains both the data and the target band, padded a little.
+ *
+ * Without this the band can sit outside the data's own range and simply not be drawn — which is
+ * how the target window went missing from a chart whose whole purpose is showing it.
+ */
+function secondsDomain(values: number[], [min, max]: [number, number]): [number, number] {
+  const lo = Math.min(min, ...values);
+  const hi = Math.max(max, ...values);
+  const pad = Math.max(2, (hi - lo) * 0.12);
+  return [Math.max(0, Math.floor(lo - pad)), Math.ceil(hi + pad)];
+}
+
 interface Point {
   dial: number;
   seconds: number;
@@ -164,6 +204,10 @@ function toPoints(shots: Shot[], targets: Targets): Point[] {
 export function DialVsTimeChart({ shots, targets }: { shots: Shot[]; targets: Targets }) {
   const points = toPoints(shots, targets);
   const [min, max] = targets.timeWindowSec;
+  // Explicit numeric x-domain, so the target band can be told to span the whole plot. Left to
+  // Recharts' 'dataMin'/'dataMax' strings the band stops at the last data point instead.
+  const dials = points.map((p) => p.dial);
+  const xDomain: [number, number] = [Math.min(...dials) - 0.5, Math.max(...dials) + 0.5];
 
   return (
     <ChartFrame
@@ -182,24 +226,31 @@ export function DialVsTimeChart({ shots, targets }: { shots: Shot[]; targets: Ta
         <ResponsiveContainer width="100%" height={220}>
           <ScatterChart margin={{ top: 8, right: 12, bottom: 18, left: -8 }}>
             <CartesianGrid stroke={GRID} strokeDasharray="2 4" />
-            <ReferenceArea
-              y1={min}
-              y2={max}
-              fill={BAND}
-              fillOpacity={0.14}
-              stroke={BAND}
-              strokeOpacity={0.35}
-            />
             <XAxis
               {...axisProps}
               dataKey="dial"
               type="number"
-              domain={['dataMin - 0.5', 'dataMax + 0.5']}
+              domain={xDomain}
               label={{ value: 'Dial', position: 'insideBottom', offset: -10, fill: AXIS_INK, fontSize: 11 }}
             />
-            <YAxis {...axisProps} dataKey="seconds" type="number" unit="s" width={44} />
-            {/* Marks at least 8px across, per the mark spec. */}
-            <ZAxis range={[90, 90]} />
+            <YAxis
+              {...axisProps}
+              dataKey="seconds"
+              type="number"
+              unit="s"
+              width={44}
+              domain={secondsDomain(
+                points.map((p) => p.seconds),
+                targets.timeWindowSec,
+              )}
+            />
+            <ReferenceArea
+              x1={xDomain[0]}
+              x2={xDomain[1]}
+              y1={min}
+              y2={max}
+              {...BAND_STYLE}
+            />
             <Tooltip
               content={
                 <ChartTooltip
@@ -213,7 +264,7 @@ export function DialVsTimeChart({ shots, targets }: { shots: Shot[]; targets: Ta
                 />
               }
             />
-            <Scatter data={points} fill={SERIES_1} stroke="#211a15" strokeWidth={2} />
+            <Scatter data={points} fill={SERIES_1} shape={<Dot />} />
           </ScatterChart>
         </ResponsiveContainer>
       )}
@@ -250,13 +301,22 @@ export function ShotTimelineChart({ shots, targets }: { shots: Shot[]; targets: 
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={rows} margin={{ top: 8, right: 12, bottom: 18, left: -8 }}>
             <CartesianGrid stroke={GRID} strokeDasharray="2 4" />
-            <ReferenceArea y1={min} y2={max} fill={BAND} fillOpacity={0.14} />
             <XAxis
               {...axisProps}
               dataKey="index"
+              allowDecimals={false}
               label={{ value: 'Shot', position: 'insideBottom', offset: -10, fill: AXIS_INK, fontSize: 11 }}
             />
-            <YAxis {...axisProps} unit="s" width={44} />
+            <YAxis
+              {...axisProps}
+              unit="s"
+              width={44}
+              domain={secondsDomain(
+                rows.flatMap((r) => [r.extraction, r.firstDrip].filter((v): v is number => v !== null)),
+                targets.timeWindowSec,
+              )}
+            />
+            <ReferenceArea y1={min} y2={max} {...BAND_STYLE} />
             <Tooltip
               content={
                 <ChartTooltip
@@ -281,7 +341,7 @@ export function ShotTimelineChart({ shots, targets }: { shots: Shot[]; targets: 
               name="Shot time"
               stroke={SERIES_1}
               strokeWidth={2}
-              dot={{ r: 4, strokeWidth: 2, stroke: '#211a15' }}
+              dot={{ r: 4, strokeWidth: 2, stroke: SURFACE }}
               connectNulls
             />
             <Line
@@ -291,7 +351,7 @@ export function ShotTimelineChart({ shots, targets }: { shots: Shot[]; targets: 
               stroke={SERIES_2}
               strokeWidth={2}
               strokeDasharray="4 3"
-              dot={{ r: 4, strokeWidth: 2, stroke: '#211a15' }}
+              dot={{ r: 4, strokeWidth: 2, stroke: SURFACE }}
               connectNulls
             />
           </LineChart>
@@ -333,7 +393,6 @@ export function FreshnessChart({ points }: { points: FreshnessPoint[] }) {
               label={{ value: 'Days off roast', position: 'insideBottom', offset: -10, fill: AXIS_INK, fontSize: 11 }}
             />
             <YAxis {...axisProps} dataKey="rating" type="number" domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} width={44} />
-            <ZAxis range={[90, 90]} />
             <Tooltip
               content={
                 <ChartTooltip
@@ -345,7 +404,7 @@ export function FreshnessChart({ points }: { points: FreshnessPoint[] }) {
                 />
               }
             />
-            <Scatter data={points} fill={SERIES_1} stroke="#211a15" strokeWidth={2} />
+            <Scatter data={points} fill={SERIES_1} shape={<Dot />} />
           </ScatterChart>
         </ResponsiveContainer>
       )}

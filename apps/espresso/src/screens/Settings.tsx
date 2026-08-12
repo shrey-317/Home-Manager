@@ -48,7 +48,7 @@ export function SettingsScreen() {
         <p className="text-xs text-crust-500">
           Used for new sessions. Changing these leaves sessions already in progress alone.
         </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
           <Field label="Dose">
             <Stepper label="Dose" value={targets.doseG} onChange={(v) => setTargets({ doseG: v })} step={0.5} min={0} unit="g" />
           </Field>
@@ -66,7 +66,7 @@ export function SettingsScreen() {
             unit="°C"
           />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
           <Field label="Target min">
             <Stepper
               label="Target minimum seconds"

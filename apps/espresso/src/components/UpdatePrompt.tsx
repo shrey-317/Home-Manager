@@ -37,14 +37,14 @@ export function UpdatePrompt() {
           <span className="flex-1 text-crust-100">A new version is ready.</span>
           <Button
             variant="primary"
-            className="min-h-10 px-3 text-sm"
+            size="sm"
             onClick={() => void updateServiceWorker(true)}
           >
             Reload
           </Button>
           <Button
             variant="ghost"
-            className="min-h-10 px-3 text-sm"
+            size="sm"
             onClick={() => {
               setNeedRefresh(false);
               setDismissed(true);

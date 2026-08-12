@@ -130,7 +130,7 @@ export function LogShotSheet({
         <Stepper label="Yield" value={yieldG} onChange={setYieldG} step={0.1} min={0} unit="g" />
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-3">
         <Field label="Dose">
           <Stepper label="Dose" value={doseG} onChange={setDoseG} step={0.1} min={0} unit="g" />
         </Field>

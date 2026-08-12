@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { adviceHeadline, gotoFresh, pullShot } from './helpers.ts';
+import { adviceHeadline, gotoFresh, nav, pullShot } from './helpers.ts';
 
 /**
  * End-to-end coverage of the dial-in loop.
@@ -63,7 +63,7 @@ test('applying advice moves the dial and returns to the timer', async ({ page })
   await expect(page.getByRole('button', { name: /^Start/ })).toBeVisible();
   await expect(page.getByText('Dial 17')).toBeVisible();
 
-  await page.getByRole('link', { name: 'Home' }).click();
+  await nav(page, 'Home').click();
   await expect(page.getByText('17.0', { exact: true })).toBeVisible();
 });
 
@@ -78,8 +78,12 @@ test('two matching on-target shots offer to lock the dial in', async ({ page }) 
   await expect(adviceHeadline(page)).toContainText('Locked in at 16.5');
   await page.getByRole('button', { name: 'Lock in 16.5' }).click();
 
-  await expect(page.getByText('Dialled in')).toBeVisible();
-  await page.getByRole('link', { name: 'Beans' }).click();
+  // Locking in must not empty the home screen: the bean is still what you're pulling.
+  await expect(page.getByText('Dialled in at 16.5')).toBeVisible();
+  await expect(page.getByText('No bean being dialled in')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Pull a shot' })).toBeVisible();
+
+  await nav(page, 'Beans').click();
   await expect(page.getByRole('link', { name: /Ethiopia Sidama/ })).toBeVisible();
 });
 
@@ -94,7 +98,7 @@ test('channelling is blamed on the puck, never on the self-levelling tamper', as
 test('the shot log records what the coach said', async ({ page }) => {
   await pullShot(page, { extractionSec: 22, yieldG: 40, firstDripSec: 14, rating: 3 });
 
-  await page.getByRole('link', { name: 'Home' }).click();
+  await nav(page, 'Home').click();
   await page.getByRole('link', { name: /All 1 shots?/ }).click();
 
   await expect(page.getByText('Coach said:')).toBeVisible();
@@ -108,6 +112,6 @@ test('a discarded shot is logged but kept out of the advice', async ({ page }) =
   // A flush shouldn't produce a grind suggestion at all.
   await expect(page.getByRole('button', { name: /Set dial to/ })).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'Home' }).click();
+  await nav(page, 'Home').click();
   await expect(adviceHeadline(page)).toContainText('Start at 16.5');
 });

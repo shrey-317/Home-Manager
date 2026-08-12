@@ -41,7 +41,7 @@ export function BeanDetail() {
         </Link>
         <Button
           variant="ghost"
-          className="min-h-10 px-3 text-sm"
+          size="sm"
           onClick={() =>
             void beansRepo.update(bean.id, {
               state: bean.state === 'finished' ? 'active' : 'finished',
@@ -180,11 +180,11 @@ function ShotRow({ shot, session }: { shot: Shot; session: Session }) {
 function Tag({ children, tone }: { children: React.ReactNode; tone: 'good' | 'warn' | 'bad' | 'muted' }) {
   const cls =
     tone === 'good'
-      ? 'border-[--color-good] text-[--color-good]'
+      ? 'border-good text-good'
       : tone === 'warn'
-        ? 'border-[--color-warn] text-[--color-warn]'
+        ? 'border-warn text-warn'
         : tone === 'bad'
-          ? 'border-[--color-bad] text-[--color-bad]'
+          ? 'border-bad text-bad'
           : 'border-crust-700 text-crust-400';
   return <span className={`rounded-full border px-2 py-0.5 ${cls}`}>{children}</span>;
 }

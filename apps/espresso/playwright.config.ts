@@ -10,6 +10,9 @@ const PORT = 4173;
 
 export default defineConfig({
   testDir: './e2e',
+  // Each spec drives a multi-second shot through the real UI, so the 30s default is tight once
+  // several run in parallel.
+  timeout: 90_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

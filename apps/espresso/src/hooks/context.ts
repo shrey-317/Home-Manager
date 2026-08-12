@@ -34,12 +34,18 @@ export function buildDialInContext({
   shots: Shot[];
   sessionId?: string;
 }): DialInContext {
-  // Named session if asked for; otherwise the most recently started one still being dialled.
+  // Named session if asked for; otherwise the most recently started one still being dialled, and
+  // failing that the most recent locked-in one.
+  //
+  // The fallback matters: locking a dial in used to leave the home screen saying "no bean being
+  // dialled in", which turns the one success in the whole loop into an empty screen. A locked
+  // session is still the bean you are pulling — you just aren't hunting a setting any more.
+  const mostRecent = (status: Session['status']) =>
+    sessions.filter((s) => s.status === status).sort((a, b) => b.startedAt - a.startedAt)[0];
+
   const session = sessionId
     ? sessions.find((s) => s.id === sessionId)
-    : sessions
-        .filter((s) => s.status === 'dialing')
-        .sort((a, b) => b.startedAt - a.startedAt)[0];
+    : (mostRecent('dialing') ?? mostRecent('locked'));
 
   if (!session) return { shots: [] };
 

@@ -1,18 +1,36 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'dev-dist', 'coverage', 'playwright-report', 'test-results'] },
+  {
+    ignores: [
+      'dist',
+      'dev-dist',
+      'coverage',
+      'playwright-report',
+      'test-results',
+      'screenshots',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    // Build/dev scripts run in Node, not the browser.
+    files: ['scripts/**/*.mjs', '*.config.{ts,js}'],
+    languageOptions: { globals: globals.node },
+  },
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2022,
       globals: { ...globals.browser, ...globals.node },
     },
+    plugins: { 'react-hooks': reactHooks },
     rules: {
+      // The timer is built out of effects; a stale closure there means a wrong shot time.
+      ...reactHooks.configs.recommended.rules,
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
