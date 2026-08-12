@@ -2,8 +2,11 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
-  # Lets you publish before anything is merged, which is how you get a URL to install from.
+    # Every branch is matched here and then filtered to the default branch in the job's `if`.
+    # Actions has no "default branch" keyword for this list, and hardcoding `main` would mean
+    # the workflow silently never runs in a repository whose trunk is named anything else.
+    branches: ['**']
+  # Lets you publish on demand, which is how you get a URL to install from before merging.
   workflow_dispatch:
 
 permissions:
@@ -18,6 +21,10 @@ concurrency:
 
 jobs:
   build:
+    # Only the trunk publishes. A manual run is always allowed, so you can preview any branch.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     defaults:
       run:
