@@ -43,7 +43,9 @@ export async function collectPending(dbi: EspressoDB = db): Promise<PushBatch[]>
 /** Clear accepted entries and drop the `dirty` flag on rows with nothing left queued. */
 export async function markPushed(seqs: number[], dbi: EspressoDB = db): Promise<void> {
   if (seqs.length === 0) return;
-  await dbi.transaction('rw', dbi.outbox, ...SYNCED_TABLES.map((t) => dbi.table(t)), async () => {
+  // Array form of `transaction`, because the table list is computed rather than literal.
+  const tables = [dbi.outbox, ...SYNCED_TABLES.map((t) => dbi.table(t))];
+  await dbi.transaction('rw', tables, async () => {
     const entries = await dbi.outbox.bulkGet(seqs);
     await dbi.outbox.bulkDelete(seqs);
 

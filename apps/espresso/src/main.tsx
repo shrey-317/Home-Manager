@@ -2,10 +2,12 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
+import { seedIfEmpty } from './db/seed.ts';
 import './styles.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root missing from index.html');
+
 
 /**
  * `import.meta.env.BASE_URL` comes from vite.config's `base`, so the router basename can
@@ -14,10 +16,26 @@ if (!rootEl) throw new Error('#root missing from index.html');
  */
 const basename = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-createRoot(rootEl).render(
-  <StrictMode>
-    <BrowserRouter basename={basename}>
-      <App />
-    </BrowserRouter>
-  </StrictMode>,
-);
+function render() {
+  createRoot(rootEl!).render(
+    <StrictMode>
+      <BrowserRouter basename={basename}>
+        <App />
+      </BrowserRouter>
+    </StrictMode>,
+  );
+}
+
+/**
+ * Seed before the first paint, so the app never flashes an empty state it is about to fill.
+ *
+ * Deliberately a promise chain rather than top-level await: TLA would force the build target
+ * up to browsers that support it, and this needs to run on the Safari version already on the
+ * phone. A failure is not fatal either — private-mode Safari can refuse IndexedDB outright —
+ * so we render regardless and let each screen show its own empty state.
+ */
+seedIfEmpty()
+  .catch((err: unknown) => {
+    console.error('Could not prepare the local database', err);
+  })
+  .finally(render);

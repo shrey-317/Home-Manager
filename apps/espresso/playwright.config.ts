@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { chromiumLaunchOptions } from './scripts/chromium.mjs';
 
 /**
  * The e2e suite runs against a production build served by `vite preview`, not the dev
@@ -19,14 +20,20 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
+  // Both projects run on Chromium: the point is to exercise the two viewport sizes the app
+  // will actually be installed on, not to test WebKit's rendering.
   projects: [
     {
       name: 'pixel',
-      use: { ...devices['Pixel 7'] },
+      use: { ...devices['Pixel 7'], launchOptions: chromiumLaunchOptions() },
     },
     {
       name: 'iphone',
-      use: { ...devices['iPhone 14'] },
+      use: {
+        ...devices['iPhone 14'],
+        defaultBrowserType: 'chromium',
+        launchOptions: chromiumLaunchOptions(),
+      },
     },
   ],
   webServer: {

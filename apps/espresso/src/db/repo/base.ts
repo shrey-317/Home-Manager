@@ -125,3 +125,23 @@ export async function listRows<T extends SyncedTableName>(
 export function live<R extends Synced>(rows: R[] | undefined): R[] {
   return (rows ?? []).filter((r) => !r.deletedAt);
 }
+
+/**
+ * A whole table as a **single** query, for use inside `useLiveQuery`.
+ *
+ * Deliberately not an `async` function. Dexie tracks which tables a live query touched by
+ * observing the queries issued inside its own execution zone, and that zone is lost after the
+ * first `await` in a native async function. A read path like
+ * `useLiveQuery(async () => { const s = await getSession(); return getShots(s.id); })` therefore
+ * subscribes only to `sessions`, and writing a shot never refreshes the screen — which is
+ * exactly the bug this replaced.
+ *
+ * So: hooks issue one un-awaited query per table and do the joining in plain JavaScript.
+ * Tombstones are included here and filtered by `live()` at the call site.
+ */
+export function queryTable<T extends SyncedTableName>(
+  name: T,
+  dbi: EspressoDB = defaultDb,
+): Promise<RowFor<T>[]> {
+  return tableOf(dbi, name).toArray() as unknown as Promise<RowFor<T>[]>;
+}

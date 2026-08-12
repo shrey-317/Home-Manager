@@ -5,7 +5,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "types": ["vite/client", "vite-plugin-pwa/client", "vitest/globals"],
+    // `node` is needed for `process.env` in the vite/playwright configs.
+    "types": ["node", "vite/client", "vite-plugin-pwa/client", "vitest/globals"],
 
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -15,6 +16,9 @@
     "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": false,
 
+    // `allowJs` lets the TS configs share scripts/chromium.mjs rather than duplicating it.
+    "allowJs": true,
+    "checkJs": false,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
