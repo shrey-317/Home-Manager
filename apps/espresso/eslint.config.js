@@ -17,8 +17,8 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // Build/dev scripts run in Node, not the browser.
-    files: ['scripts/**/*.mjs', '*.config.{ts,js}'],
+    // Build/dev scripts and the e2e stub server run in Node, not the browser.
+    files: ['scripts/**/*.mjs', 'e2e/**/*.mjs', '*.config.{ts,js}'],
     languageOptions: { globals: globals.node },
   },
   {

@@ -7,6 +7,8 @@ import { chromiumLaunchOptions } from './scripts/chromium.mjs';
  * real build. BASE_PATH=/ keeps preview URLs at the root so specs can navigate to '/'.
  */
 const PORT = 4173;
+/** Where the fake Supabase project listens; the sync spec points the app at it. */
+export const STUB_PORT = 54_321;
 
 export default defineConfig({
   testDir: './e2e',
@@ -39,10 +41,20 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: 'BASE_PATH=/ npm run build && BASE_PATH=/ npx vite preview --port ' + PORT,
-    port: PORT,
-    reuseExistingServer: !process.env.CI,
-    timeout: 180_000,
-  },
+  webServer: [
+    {
+      command: 'BASE_PATH=/ npm run build && BASE_PATH=/ npx vite preview --port ' + PORT,
+      port: PORT,
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
+    },
+    {
+      // Stands in for a Supabase project so the sync spec can prove two devices converge.
+      // See e2e/stub-supabase.mjs for what it does and does not model.
+      command: `STUB_PORT=${STUB_PORT} node e2e/stub-supabase.mjs`,
+      port: STUB_PORT,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+  ],
 });

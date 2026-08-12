@@ -1,7 +1,7 @@
 import type { Table } from 'dexie';
 import type { Synced } from '../../domain/types.ts';
 import { db as defaultDb, type EspressoDB } from '../schema.ts';
-import type { RowFor, SyncedTableName } from '../sync/types.ts';
+import { isSyncedTable, type RowFor, type SyncedTableName, type TableName } from '../sync/types.ts';
 
 /**
  * The one place that writes to IndexedDB.
@@ -28,6 +28,33 @@ export type NewRow<R extends Synced> = R extends unknown
 /** Fields a caller may change. The envelope is ours to manage. */
 export type RowPatch<R extends Synced> = R extends unknown ? Partial<Omit<R, keyof Synced>> : never;
 
+/**
+ * Local-write notifications.
+ *
+ * The sync engine wants to know when something changed, but the repo layer must not depend on
+ * sync — the app has to work identically with sync switched off, and a test using a scratch
+ * database shouldn't reach a global engine. So writes are announced to whoever is listening and
+ * `main.tsx` does the wiring.
+ */
+type WriteListener = (table: SyncedTableName, id: string) => void;
+const writeListeners = new Set<WriteListener>();
+
+export function onLocalWrite(listener: WriteListener): () => void {
+  writeListeners.add(listener);
+  return () => writeListeners.delete(listener);
+}
+
+function announceWrite(table: TableName, id: string): void {
+  if (!isSyncedTable(table)) return;
+  for (const listener of writeListeners) {
+    try {
+      listener(table, id);
+    } catch {
+      // A listener must never be able to fail a write the user just made.
+    }
+  }
+}
+
 export function newId(): string {
   // `crypto.randomUUID` needs a secure context; the fallback keeps http://localhost and
   // older WebViews working. Not cryptographically meaningful either way — these are keys.
@@ -40,11 +67,11 @@ export function newId(): string {
  * once here rather than casting at every call site.
  */
 type ErasedRow = Synced & Record<string, unknown>;
-function tableOf(dbi: EspressoDB, name: SyncedTableName): Table<ErasedRow, string> {
+function tableOf(dbi: EspressoDB, name: TableName): Table<ErasedRow, string> {
   return dbi.table(name) as unknown as Table<ErasedRow, string>;
 }
 
-export async function createRow<T extends SyncedTableName>(
+export async function createRow<T extends TableName>(
   name: T,
   data: NewRow<RowFor<T>>,
   dbi: EspressoDB = defaultDb,
@@ -60,12 +87,15 @@ export async function createRow<T extends SyncedTableName>(
 
   await dbi.transaction('rw', tableOf(dbi, name), dbi.outbox, async () => {
     await tableOf(dbi, name).put(row);
-    await dbi.outbox.add({ table: name, rowId: row.id, op: 'upsert', at: row.updatedAt });
+    if (isSyncedTable(name)) {
+      await dbi.outbox.add({ table: name, rowId: row.id, op: 'upsert', at: row.updatedAt });
+    }
   });
+  announceWrite(name, row.id);
   return row as unknown as RowFor<T>;
 }
 
-export async function updateRow<T extends SyncedTableName>(
+export async function updateRow<T extends TableName>(
   name: T,
   id: string,
   patch: RowPatch<RowFor<T>>,
@@ -79,30 +109,38 @@ export async function updateRow<T extends SyncedTableName>(
     if (!existing) throw new Error(`${name}: no row with id ${id}`);
     updated = { ...existing, ...(patch as Record<string, unknown>), updatedAt: Date.now(), dirty: 1 };
     await table.put(updated);
-    await dbi.outbox.add({ table: name, rowId: id, op: 'upsert', at: updated.updatedAt });
+    if (isSyncedTable(name)) {
+      await dbi.outbox.add({ table: name, rowId: id, op: 'upsert', at: updated.updatedAt });
+    }
   });
 
+  announceWrite(name, id);
   return updated as unknown as RowFor<T>;
 }
 
 /** Tombstone a row. Reads stop seeing it; sync still learns about the deletion. */
-export async function deleteRow<T extends SyncedTableName>(
+export async function deleteRow<T extends TableName>(
   name: T,
   id: string,
   dbi: EspressoDB = defaultDb,
 ): Promise<void> {
   const table = tableOf(dbi, name);
+  let deleted = false;
   await dbi.transaction('rw', table, dbi.outbox, async () => {
     const existing = await table.get(id);
     if (!existing) return;
     const at = Date.now();
     await table.put({ ...existing, deletedAt: at, updatedAt: at, dirty: 1 });
-    await dbi.outbox.add({ table: name, rowId: id, op: 'delete', at });
+    if (isSyncedTable(name)) {
+      await dbi.outbox.add({ table: name, rowId: id, op: 'delete', at });
+    }
+    deleted = true;
   });
+  if (deleted) announceWrite(name, id);
 }
 
 /** Single row by id, or undefined if missing *or* tombstoned. */
-export async function getRow<T extends SyncedTableName>(
+export async function getRow<T extends TableName>(
   name: T,
   id: string,
   dbi: EspressoDB = defaultDb,
@@ -113,7 +151,7 @@ export async function getRow<T extends SyncedTableName>(
 }
 
 /** All live (non-tombstoned) rows in a table. */
-export async function listRows<T extends SyncedTableName>(
+export async function listRows<T extends TableName>(
   name: T,
   dbi: EspressoDB = defaultDb,
 ): Promise<RowFor<T>[]> {
@@ -139,7 +177,7 @@ export function live<R extends Synced>(rows: R[] | undefined): R[] {
  * So: hooks issue one un-awaited query per table and do the joining in plain JavaScript.
  * Tombstones are included here and filtered by `live()` at the call site.
  */
-export function queryTable<T extends SyncedTableName>(
+export function queryTable<T extends TableName>(
   name: T,
   dbi: EspressoDB = defaultDb,
 ): Promise<RowFor<T>[]> {

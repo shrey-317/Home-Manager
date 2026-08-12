@@ -2,7 +2,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
+import { onLocalWrite } from './db/repo/base.ts';
 import { seedIfEmpty } from './db/seed.ts';
+import { syncEngine } from './db/sync/engine.ts';
 import './styles.css';
 
 const rootEl = document.getElementById('root');
@@ -38,4 +40,19 @@ seedIfEmpty()
   .catch((err: unknown) => {
     console.error('Could not prepare the local database', err);
   })
-  .finally(render);
+  .finally(() => {
+    render();
+    startSync();
+  });
+
+/**
+ * Sync is started *after* the first render and never awaited, because it is optional: an
+ * unconfigured project, an expired session or a dead network must all leave the app exactly as
+ * usable as it was before sync existed. The engine catches its own failures and reports them as
+ * status on the Setup screen.
+ */
+function startSync() {
+  onLocalWrite(() => syncEngine.notifyLocalChange());
+  syncEngine.attachWindowListeners();
+  void syncEngine.start();
+}

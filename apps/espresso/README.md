@@ -55,15 +55,65 @@ Discarded shots (flushes, spills) stay in the log and are excluded from advice a
 
 ## Data
 
-Everything is stored on the device in IndexedDB. No account, no server, nothing leaves the phone.
-Export JSON to back up or move to a new phone, or CSV to open the shot log in a spreadsheet;
+Shots are written to IndexedDB on the device first, always, and every screen works with no
+network. Export JSON to keep a backup of your own, or CSV to open the log in a spreadsheet;
 importing merges rather than replaces, newest edit winning per row.
 
 Every row carries a sync envelope (`updatedAt`, `deletedAt`, `dirty`) and all writes funnel
 through `src/db/repo`, which stamps them and queues an outbox entry in the same transaction.
-Deletes are tombstones. **No sync service ships here** — `src/db/sync/types.ts` defines the seam
-and documents the conflict policy (last write wins on `updatedAt`; a tombstone beats a concurrent
-edit) so adding a backend later touches `src/db/sync/` and nothing else.
+Deletes are tombstones, so a deletion can actually propagate.
+
+## Sync between two phones
+
+Optional, and off until you configure it. With it on, two phones share one set of beans, gear,
+sessions and shots.
+
+**Device settings deliberately do not sync** — theme, sound, haptics and keep-awake describe a
+phone, not a household.
+
+### Setting it up
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. Open the SQL editor and run [`supabase/schema.sql`](supabase/schema.sql). It is idempotent.
+3. In the app: **Setup → Sync between phones**, paste the **Project URL** and the **anon** public
+   key from Supabase → Settings → API, then create an account.
+4. On the second phone, do the same and sign in — then copy the **household code** from the first
+   phone and paste it into *Join the other phone's household*. Shots already on the second phone
+   are kept and pushed into the household it joins.
+
+The anon key belongs in the client: it is designed to be public, and the row-level security in
+the schema is what protects the data. The `service_role` key must never go near the app.
+
+The household id is effectively a shared secret — anyone holding it can join — which is the same
+trust model as a shared calendar link.
+
+### How it behaves
+
+- **Local first.** A write lands in IndexedDB and is queued; sync is a background chore that
+  happens afterwards. A failure surfaces as status on the Setup screen and never interrupts
+  logging a shot.
+- **When it syncs.** On launch, a couple of seconds after a change (debounced), when the app comes
+  back to the foreground, when the network returns, and once a minute while open. Not realtime:
+  two phones rarely pull shots at the same moment, and it avoids holding a socket open in a pocket.
+- **Conflicts.** Last write wins on `updatedAt`, except that a tombstone beats a concurrent edit —
+  a bean you deleted on one phone shouldn't be resurrected by a stale edit from the other. Clock
+  skew between two phones on network time is seconds, which shot logs tolerate.
+- **What travels.** One `sync_rows` table with the domain object in a `jsonb` column, rather than a
+  column-per-field mirror. The app is the only consumer and the model is still moving; mirroring
+  columns would mean a Postgres migration for every field. The tradeoff is no useful server-side
+  reporting SQL — use the CSV export for that.
+
+### What the tests do and don't prove
+
+`e2e/sync.spec.ts` drives two independent browser contexts — two devices, separate storage,
+separate sign-ins — against a stub project (`e2e/stub-supabase.mjs`) using the real supabase-js
+client, and asserts that a shot logged on one shows up on the other, that an offline shot syncs
+when the network returns, and that the app is untouched with sync switched off.
+
+It does **not** prove `supabase/schema.sql` or its row-level security are correct: the stub only
+simulates household scoping, and real policy enforcement needs a real project. The first sync
+against your own project is the test for that — and if the schema hasn't been applied, the app
+says the database refused the change rather than failing silently.
 
 ## Installing it on a phone
 
@@ -106,14 +156,16 @@ a UI change — the automated checks cover colour and behaviour, not whether a l
 
 ```
 src/domain/     pure logic: advice engine, metrics, timer state machine — no DB, no React
-src/db/         Dexie schema, the repo layer every write goes through, seed, sync seam
+src/db/         Dexie schema, the repo layer every write goes through, seed, backup
+src/db/sync/    the sync contract, the Supabase adapter, and the scheduling engine
 src/hooks/      live queries and the pure context builder that joins them
 src/platform/   haptics, wake lock, install — feature-detected, all degrade to no-ops
 src/screens/    one file per screen
 src/components/ shared UI and the charts
+supabase/       the SQL to run once in your own project
 ```
 
-### Two things worth knowing before changing code
+### Three things worth knowing before changing code
 
 **Live queries.** Dexie only re-runs a live query when a table it observed is written, and that
 observation is lost after the first `await` in an async callback. So hooks issue exactly one
@@ -124,3 +176,8 @@ looks correct and silently stops updating.
 `basename`, and the manifest `scope`/`start_url` must all agree. They all derive from `BASE_PATH`;
 disagreement produces a blank installed app or an install that silently refuses. An e2e test
 checks the manifest against the path it was actually served from.
+
+**`TableName` vs `SyncedTableName`.** The repo layer manages five tables; four of them sync. Those
+are separate types on purpose — collapsing them is what once let `settings` writes into the sync
+outbox, which both inflated the "waiting to send" count forever and produced a Dexie transaction
+whose scope was missing the store it then read. If you add a table, decide which it is.

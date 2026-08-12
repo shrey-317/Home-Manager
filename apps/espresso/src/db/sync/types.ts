@@ -1,9 +1,27 @@
 import type { Bean, Gear, Session, Settings, Shot } from '../../domain/types.ts';
 
-/** Tables that participate in sync. `outbox` itself is local-only and never synced. */
-export type SyncedTableName = 'beans' | 'gear' | 'sessions' | 'shots' | 'settings';
+/** Every table the repo layer manages. `outbox` is internal and not one of these. */
+export type TableName = 'beans' | 'gear' | 'sessions' | 'shots' | 'settings';
 
-export type RowFor<T extends SyncedTableName> = T extends 'beans'
+/**
+ * The tables that actually sync.
+ *
+ * `settings` is excluded: theme, haptics and keep-awake describe a phone, not a household, and
+ * syncing them means two devices overwriting each other's preferences.
+ *
+ * Keeping this distinct from `TableName` in the type system is not pedantry — collapsing the two
+ * is what let outbox entries be written for a table that sync later refused to touch, producing a
+ * transaction whose scope was missing a store and a "waiting to send" count that never cleared.
+ */
+export type SyncedTableName = Exclude<TableName, 'settings'>;
+
+export const SYNCED_TABLES: SyncedTableName[] = ['beans', 'gear', 'sessions', 'shots'];
+
+export function isSyncedTable(name: string): name is SyncedTableName {
+  return (SYNCED_TABLES as string[]).includes(name);
+}
+
+export type RowFor<T extends TableName> = T extends 'beans'
   ? Bean
   : T extends 'gear'
     ? Gear
@@ -20,16 +38,23 @@ export type RowFor<T extends SyncedTableName> = T extends 'beans'
 export interface OutboxEntry {
   /** Auto-incremented; also the drain order. */
   seq?: number;
+  /** Always a syncable table — the repo layer does not queue anything else. */
   table: SyncedTableName;
   rowId: string;
   op: 'upsert' | 'delete';
   at: number;
 }
 
+/**
+ * Rows to send for one table.
+ *
+ * There is no separate list of deletions: a delete in this app *is* a row state
+ * (`deletedAt` set), so a tombstone travels as an ordinary row. That removes a whole parallel
+ * path from both the push and pull sides — and a parallel path is where a delete gets lost.
+ */
 export interface PushBatch {
   table: SyncedTableName;
-  upserts: unknown[];
-  deletes: string[];
+  rows: unknown[];
 }
 
 /**
@@ -47,8 +72,17 @@ export interface PushBatch {
  */
 export interface SyncAdapter {
   readonly name: string;
-  /** Push queued local changes. Resolves with the entries that were accepted. */
-  push(batches: PushBatch[]): Promise<{ acceptedSeqs: number[] }>;
-  /** Pull everything changed server-side since `since` (epoch ms). */
-  pull(since: number): Promise<{ batches: PushBatch[]; serverTime: number }>;
+  /**
+   * Push queued local changes. Resolves once they are durably stored remotely; throwing means
+   * nothing was accepted and the outbox must be left intact for the next attempt.
+   */
+  push(batches: PushBatch[]): Promise<void>;
+  /**
+   * Pull everything changed remotely since `since` (epoch ms, exclusive).
+   *
+   * `watermark` is what to pass as `since` next time. It comes from the highest `updatedAt`
+   * actually seen rather than a clock reading, so a row written while the pull was in flight
+   * cannot be skipped.
+   */
+  pull(since: number): Promise<{ batches: PushBatch[]; watermark: number }>;
 }

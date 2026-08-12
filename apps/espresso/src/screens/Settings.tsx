@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BigButton, Button, Card, Chip, Field, SectionTitle, Stepper, Toggle } from '../components/ui.tsx';
+import { SyncCard } from '../components/SyncCard.tsx';
 import { downloadFile, exportBackup, exportShotsCsv, importBackup } from '../db/backup.ts';
 import { settingsRepo } from '../db/repo/settings.ts';
 import type { Targets, TimingBasis } from '../domain/types.ts';
@@ -42,6 +43,8 @@ export function SettingsScreen() {
       </div>
 
       <InstallCard />
+
+      <SyncCard />
 
       <SectionTitle>Default recipe</SectionTitle>
       <Card className="mb-6 space-y-3">
@@ -143,8 +146,8 @@ export function SettingsScreen() {
       <SectionTitle>Your data</SectionTitle>
       <Card className="mb-6 space-y-3">
         <p className="text-xs text-crust-500">
-          Everything lives on this device only — no account, no server. Export is how you back it up
-          or move to a new phone.
+          Shots are stored on this phone first and always work offline. Export is a backup you hold
+          yourself — worth having whether or not sync is switched on.
         </p>
         <div className="grid grid-cols-2 gap-2">
           <Button
