@@ -49,6 +49,12 @@ jobs:
         # refresh. Serving index.html as the 404 page hands those URLs back to the router.
         run: cp dist/index.html dist/404.html
       - uses: actions/configure-pages@v5
+        with:
+          # Turns Pages on (build type: GitHub Actions) if it isn't already, instead of just
+          # failing with "Get Pages site failed... Not Found". The manual dashboard toggle should
+          # do the same thing, but it's flaky to confirm from a phone browser — this makes the
+          # workflow self-sufficient regardless.
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/espresso/dist
